@@ -1,40 +1,23 @@
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { MachineCard } from '../components/MachineCard';
-import type { Machine } from '../types';
+import { ConditionSummary } from '../components/ConditionSummary';
+import { UrgentMachineCard } from '../components/UrgentMachineCard';
+import { SquareButton } from '../../../shared/components/SquareButton';
+import { useMachineDetails } from '../hooks/useMachineDetails';
+import { sortByUrgency } from '../utils/sortByUrgency';
+import { countByCondition, getConditionLevel } from '../utils/machineCondition';
+import { getMachineHistory } from '../api/machinesApi';
+import type { MachineDetail } from '../types';
 
-const MOCK_MACHINES: Machine[] = [
-  {
-    id: 1,
-    machineName: 'CNC Mill A1',
-    location: 'Building 2, Floor 1',
-    productionYear: 2019,
-    createdAt: '2024-01-10T08:00:00Z',
-  },
-  {
-    id: 2,
-    machineName: 'Lathe B3',
-    location: 'Building 1, Floor 2',
-    productionYear: 2021,
-    createdAt: '2024-03-22T08:00:00Z',
-  },
-  {
-    id: 3,
-    machineName: 'Press C7',
-    location: 'Building 2, Floor 1',
-    productionYear: 2017,
-    createdAt: '2023-11-05T08:00:00Z',
-  },
-];
+const DASHBOARD_LIMIT = 5;
 
-function DashboardHeader() {
-  const handleAddMachine = () => {
-    console.log('Add machine tapped');
-  };
-
+function DashboardHeader({ onSeeAll }: { onSeeAll: () => void }) {
   return (
     <View style={styles.header}>
       <Text style={styles.headerText}>Jadwal hari ini</Text>
-      <Pressable onPress={handleAddMachine}>
+      <Pressable onPress={onSeeAll}>
         <Text style={styles.link}>Lihat semua</Text>
       </Pressable>
     </View>
@@ -42,15 +25,88 @@ function DashboardHeader() {
 }
 
 export function DashboardScreen() {
+  const router = useRouter();
+  const { machines, isLoading, error, reload } = useMachineDetails();
+  const topUrgent = sortByUrgency(machines).slice(0, DASHBOARD_LIMIT);
+  const mostUrgent = topUrgent[0];
+  const conditionCounts = countByCondition(machines);
+
+  const [urgentCategory, setUrgentCategory] = useState<string | null>(null);
+
+  // Only the single most urgent machine's category is needed here, so fetch
+  // its history separately rather than pulling every machine's full history
+  // up front just for one line of text.
+  useEffect(() => {
+    if (!mostUrgent) {
+      setUrgentCategory(null);
+      return;
+    }
+    let cancelled = false;
+    getMachineHistory(mostUrgent.machineId)
+      .then((history) => {
+        if (!cancelled) setUrgentCategory(history[0]?.maintenanceType ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setUrgentCategory(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mostUrgent?.machineId]);
+
+  const handleSeeAll = () => {
+    router.push('/dashboard/schedules');
+  };
+
+  const handleOpenMachine = (machine: MachineDetail) => {
+    router.push(`/dashboard/machine/${machine.machineId}`);
+  };
+
+  const isMostUrgentCritical =
+    mostUrgent !== undefined && mostUrgent.ahs !== null && getConditionLevel(mostUrgent.ahs) === 'critical';
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>PrediktIF</Text>
-      <DashboardHeader />
-      <FlatList
-        data={MOCK_MACHINES}
-        keyExtractor={(machine) => machine.id.toString()}
-        renderItem={({ item }) => <MachineCard machine={item} />}
+      {!isLoading && !error && mostUrgent && isMostUrgentCritical && (
+        <UrgentMachineCard
+          machine={mostUrgent}
+          category={urgentCategory}
+          onPress={() => handleOpenMachine(mostUrgent)}
+        />
+      )}
+      {!isLoading && !error && machines.length > 0 && <ConditionSummary counts={conditionCounts} />}
+      <SquareButton
+        label="Scan QR Mesin"
+        icon={{ iconStyle: 'solid', name: 'qrcode' }}
+        onPress={() => router.push('/dashboard/scan')}
       />
+      <DashboardHeader onSeeAll={handleSeeAll} />
+      {isLoading && <ActivityIndicator style={styles.stateBox} color="#1E8EF2" />}
+      {!isLoading && error && (
+        <View style={styles.stateBox}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={reload}>
+            <Text style={styles.link}>Coba lagi</Text>
+          </Pressable>
+        </View>
+      )}
+      {!isLoading && !error && topUrgent.length === 0 && (
+        <View style={styles.stateBox}>
+          <Text style={styles.detail}>Belum ada mesin terdaftar.</Text>
+        </View>
+      )}
+      {!isLoading && !error && topUrgent.length > 0 && (
+        <FlatList
+          data={topUrgent}
+          keyExtractor={(machine) => machine.id.toString()}
+          renderItem={({ item }) => (
+            <MachineCard machine={item} onPress={() => handleOpenMachine(item)} />
+          )}
+          onRefresh={reload}
+          refreshing={false}
+        />
+      )}
     </View>
   );
 }
@@ -81,5 +137,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1E8EF2',
+  },
+  stateBox: {
+    marginTop: 32,
+    alignItems: 'center',
+    gap: 12,
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  detail: {
+    fontSize: 14,
+    color: '#666',
   },
 });

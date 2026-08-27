@@ -1,59 +1,50 @@
-import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { MachineDetail } from '../types';
+import { StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
+import type { MachineDetail } from '../types';
 import { getConditionColor } from '../utils/machineCondition';
 import { formatUpdateTime } from '../utils/formatTime';
 
-type MachineCardProps = {
+type ScannedMachineCardProps = {
   machine: MachineDetail;
-  onPress: () => void;
 };
 
-export const MachineCard = memo(function MachineCard({ machine, onPress }: MachineCardProps) {
+export function ScannedMachineCard({ machine }: ScannedMachineCardProps) {
   const ahs = machine.ahs ?? 0;
   const conditionColor = getConditionColor(ahs);
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={onPress}
-    >
+    <View style={styles.card}>
       <View style={styles.iconGroup}>
         <FontAwesome6 name="clock" iconStyle="regular" size={24} color={conditionColor} />
         <View style={styles.textContainer}>
           <Text style={styles.name}>{machine.machineName}</Text>
-          <Text style={styles.detail}>{machine.location}</Text>
+          <Text style={styles.detail}>Status: {machine.statusName}</Text>
+          <Text style={styles.detail}>Lokasi: {machine.location}</Text>
         </View>
       </View>
       <View style={styles.textContainer}>
         <Text style={[styles.condition, { color: conditionColor }]}>AHS {ahs}%</Text>
         <Text style={styles.detail}>{formatUpdateTime(machine.lastUpdate)}</Text>
       </View>
-    </Pressable>
+    </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingVertical: 21,
-    paddingHorizontal: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     backgroundColor: '#fff',
-    marginBottom: 8,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#D7D7D7',
-    elevation: 1
-  },
-  pressed: {
-    opacity: 0.7,
+    marginBottom: 12,
   },
   iconGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexShrink: 1,
   },
   textContainer: {
     marginLeft: 16,

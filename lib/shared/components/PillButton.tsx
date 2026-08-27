@@ -1,11 +1,11 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-type PrimaryButtonProps = {
+type PillButtonProps = {
   label: string;
   onPress: () => void;
 };
 
-export function PrimaryButton({ label, onPress }: PrimaryButtonProps) {
+export function PillButton({ label, onPress }: PillButtonProps) {
   return (
     <Pressable
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
@@ -23,6 +23,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 12,
     paddingHorizontal: 24,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
