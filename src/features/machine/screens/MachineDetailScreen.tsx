@@ -1,42 +1,52 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
+import { PillButton } from '@/shared/components/PillButton';
 import { ApiError } from '@/shared/api/apiClient';
-import { getCompletedMaintenanceHistory, getMachineDetailByMachineId } from '../api/machinesApi';
 import {
-  getConditionBackground,
-  getConditionColor,
-  getConditionLabel,
-} from '../utils/machineCondition';
+  getCompletedMaintenanceHistory,
+  getOpenWorkOrderByMachineId,
+  getUnderMaintenanceById,
+} from '../api/machinesApi';
+import { getCondition } from '../utils/machineCondition';
 import { formatSecondsDuration } from '@/shared/utils/formatTime';
-import { daysSinceLastService } from '../utils/daysSinceLastService';
-import type { CompletedMaintenanceItem, MachineDetail } from '../types';
+import type { CompletedMaintenanceItem, MaintenanceDetail } from '../types';
 import { ActivityListItem } from '../components/ActivityListItem';
+
+const ACTIVITY_LIMIT = 3;
 
 type MachineDetailScreenProps = {
   machineId: number;
+  // Shows the "Isi penilaian" action. Enabled only when the screen was reached by
+  // scanning the machine's QR - the technician is physically at the machine and can
+  // close out its work order. From the dashboard the screen is read-only.
+  canFillAssessment?: boolean;
 };
 
-export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
+export function MachineDetailScreen({ machineId, canFillAssessment = false }: MachineDetailScreenProps) {
   const router = useRouter();
-  const [machine, setMachine] = useState<MachineDetail | null>(null);
+  const [workOrder, setWorkOrder] = useState<MaintenanceDetail | null>(null);
   const [history, setHistory] = useState<CompletedMaintenanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadMachine = useCallback(async () => {
+  const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const machineResult = await getMachineDetailByMachineId(machineId);
-
-      if (!machineResult) {
-        setError(`Mesin dengan ID ${machineId} tidak ditemukan.`);
+      // Both entry points (dashboard card, QR scan) come from an open work order.
+      const openWorkOrder = await getOpenWorkOrderByMachineId(machineId);
+      if (!openWorkOrder) {
+        setError('Mesin ini tidak sedang dalam perbaikan.');
         return;
       }
-      setMachine(machineResult);
-      setHistory(await getCompletedMaintenanceHistory(machineResult.id));
+      const detail = await getUnderMaintenanceById(openWorkOrder.id);
+      const activity = detail.machineDetailId
+        ? await getCompletedMaintenanceHistory(detail.machineDetailId)
+        : [];
+      setWorkOrder(detail);
+      setHistory(activity);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gagal memuat data mesin.');
     } finally {
@@ -45,17 +55,30 @@ export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
   }, [machineId]);
 
   useEffect(() => {
-    loadMachine();
-  }, [loadMachine]);
+    load();
+  }, [load]);
 
-  const handleSeeAllActivity = () => {
-    // The full history is already shown inline below (no server-side limit
-    // applied) - this has nowhere further to go until a dedicated activity-log
-    // screen exists (e.g. with type/date filtering for machines with long histories).
-    console.log('Lihat semua aktivitas tapped for machine', machineId);
+  const handleFillAssessment = () => {
+    if (!workOrder) return;
+    router.push({
+      pathname: '/machine/[machineId]/report',
+      params: { machineId: String(machineId), workOrderId: String(workOrder.id) },
+    });
   };
 
-  const daysSince = daysSinceLastService(history);
+  const handleSeeAllActivity = () => {
+    if (workOrder?.machineDetailId == null) return;
+    router.push({
+      pathname: '/machine/[machineId]/history',
+      params: { machineId: String(machineId), machineDetailId: String(workOrder.machineDetailId) },
+    });
+  };
+
+  const ahs = workOrder?.ahs ?? 0;
+  const { color: accent, background: tint, label: conditionLabel } = getCondition(ahs);
+
+  const visibleHistory = history.slice(0, ACTIVITY_LIMIT);
+  const hasMoreActivity = history.length > ACTIVITY_LIMIT;
 
   return (
     <View style={styles.container}>
@@ -63,7 +86,7 @@ export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <FontAwesome6 name="xmark" iconStyle="solid" size={20} color="#000" />
         </Pressable>
-        <Text style={styles.headerTitle}>{machine?.machineName ?? '...'}</Text>
+        <Text style={styles.headerTitle}>{workOrder?.machineName ?? '...'}</Text>
       </View>
 
       {isLoading && <ActivityIndicator style={styles.stateBox} color="#1E8EF2" />}
@@ -71,58 +94,69 @@ export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
       {!isLoading && error && (
         <View style={styles.stateBox}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={loadMachine}>
+          <Pressable onPress={load}>
             <Text style={styles.link}>Coba lagi</Text>
           </Pressable>
         </View>
       )}
 
-      {!isLoading && !error && machine && (
-        <View style={styles.content}>
-          <HealthScoreCard ahs={machine.ahs ?? 0} />
+      {!isLoading && !error && workOrder && (
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={[styles.card, styles.healthCard, { backgroundColor: tint, borderColor: accent }]}>
+            <Text style={[styles.healthLabel, { color: accent }]}>Skor kesehatan aset</Text>
+            <Text style={[styles.healthScore, { color: accent }]}>{ahs}%</Text>
+            <View style={[styles.healthBadge, { backgroundColor: accent }]}>
+              <Text style={styles.healthBadgeText}>{conditionLabel}</Text>
+            </View>
+          </View>
 
           <View style={styles.statGrid}>
-            <StatBox label="Tahun produksi" value={machine.productionYear?.toString() ?? '-'} />
-            <StatBox label="Jam operasi" value={formatSecondsDuration(machine.operationHours)} />
-            <StatBox label="Jam downtime" value={formatSecondsDuration(machine.downtimeHours)} />
-            <StatBox label="Hari sejak servis" value={daysSince !== null ? daysSince.toString() : '-'} />
+            <StatBox label="Tahun produksi" value={workOrder.productionYear?.toString() ?? '-'} tint={tint} accent={accent} />
+            <StatBox label="Jam operasi" value={formatSecondsDuration(workOrder.operationHours)} tint={tint} accent={accent} />
+            <StatBox label="Jam downtime" value={formatSecondsDuration(workOrder.downtimeHours)} tint={tint} accent={accent} />
+            <StatBox
+              label="Hari sejak servis"
+              value={workOrder.daysSinceLastService !== null ? workOrder.daysSinceLastService.toString() : '-'}
+              tint={tint}
+              accent={accent}
+            />
           </View>
+
+          {canFillAssessment && <PillButton label="Isi penilaian" onPress={handleFillAssessment} />}
 
           <View style={styles.activityHeader}>
             <Text style={styles.activityHeaderText}>Riwayat aktivitas</Text>
-            <Pressable onPress={handleSeeAllActivity}>
-              <Text style={styles.link}>Semua</Text>
-            </Pressable>
+            {hasMoreActivity && (
+              <Pressable onPress={handleSeeAllActivity}>
+                <Text style={styles.link}>Semua</Text>
+              </Pressable>
+            )}
           </View>
 
           {history.length === 0 ? (
             <Text style={styles.detail}>Belum ada riwayat aktivitas untuk mesin ini.</Text>
           ) : (
-            history.map((activity) => <ActivityListItem key={activity.id} activity={activity} />)
+            visibleHistory.map((activity) => <ActivityListItem key={activity.id} activity={activity} />)
           )}
-        </View>
+        </ScrollView>
       )}
     </View>
   );
 }
 
-function HealthScoreCard({ ahs }: { ahs: number }) {
-  const color = getConditionColor(ahs);
-
+function StatBox({
+  label,
+  value,
+  tint,
+  accent,
+}: {
+  label: string;
+  value: string;
+  tint: string;
+  accent: string;
+}) {
   return (
-    <View style={[styles.healthCard, { backgroundColor: getConditionBackground(ahs), borderColor: color }]}>
-      <Text style={[styles.healthLabel, { color }]}>Skor kesehatan aset</Text>
-      <Text style={[styles.healthScore, { color }]}>{ahs}%</Text>
-      <View style={[styles.healthBadge, { backgroundColor: color }]}>
-        <Text style={styles.healthBadgeText}>{getConditionLabel(ahs)}</Text>
-      </View>
-    </View>
-  );
-}
-
-function StatBox({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statBox}>
+    <View style={[styles.card, styles.statBox, { backgroundColor: tint, borderColor: accent }]}>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
     </View>
@@ -164,10 +198,15 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 21,
+    paddingBottom: 32,
+  },
+  // Shared shell for the health card and stat boxes - matches ConditionSummary:
+  // 1px condition-coloured border over a pale tint of the same colour.
+  card: {
+    borderWidth: 1,
+    borderRadius: 12,
   },
   healthCard: {
-    borderWidth: 1,
-    borderRadius: 16,
     paddingVertical: 24,
     alignItems: 'center',
     marginBottom: 16,
@@ -200,8 +239,6 @@ const styles = StyleSheet.create({
   statBox: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: '#FDECEC',
-    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
   },

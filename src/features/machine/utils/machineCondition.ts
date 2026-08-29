@@ -1,25 +1,17 @@
 export type ConditionLevel = 'critical' | 'major' | 'minor' | 'routine';
 
-const CONDITION_COLORS: Record<ConditionLevel, string> = {
-  critical: '#FF0A0A',
-  major: '#E67E22',
-  minor: '#FACC15',
-  routine: '#22A06B',
+type Condition = {
+  level: ConditionLevel;
+  color: string; // solid - text, borders, badges
+  background: string; // pale tint of `color` - card fills
+  label: string; // Indonesian: Kritis / Waspada / Perhatian / Sehat
 };
 
-const CONDITION_LABELS: Record<ConditionLevel, string> = {
-  critical: 'Kritis',
-  major: 'Waspada',
-  minor: 'Perhatian',
-  routine: 'Sehat',
-};
-
-// Pale tints of CONDITION_COLORS, for card backgrounds behind the solid text/badge color.
-const CONDITION_BACKGROUNDS: Record<ConditionLevel, string> = {
-  critical: '#FDECEC',
-  major: '#FCF1E6',
-  minor: '#FEF9E7',
-  routine: '#E9F7F0',
+const CONDITIONS: Record<ConditionLevel, Omit<Condition, 'level'>> = {
+  critical: { color: '#FF0A0A', background: '#FDECEC', label: 'Kritis' },
+  major: { color: '#E67E22', background: '#FCF1E6', label: 'Waspada' },
+  minor: { color: '#FACC15', background: '#FEF9E7', label: 'Perhatian' },
+  routine: { color: '#22A06B', background: '#E9F7F0', label: 'Sehat' },
 };
 
 export function getConditionLevel(score: number): ConditionLevel {
@@ -29,16 +21,11 @@ export function getConditionLevel(score: number): ConditionLevel {
   return 'routine';
 }
 
-export function getConditionColor(score: number): string {
-  return CONDITION_COLORS[getConditionLevel(score)];
-}
-
-export function getConditionLabel(score: number): string {
-  return CONDITION_LABELS[getConditionLevel(score)];
-}
-
-export function getConditionBackground(score: number): string {
-  return CONDITION_BACKGROUNDS[getConditionLevel(score)];
+// Accepts an AHS score or a level directly, and returns the colour / tint / label
+// for it. Use `.color` for text and borders, `.background` for card fills.
+export function getCondition(scoreOrLevel: number | ConditionLevel): Condition {
+  const level = typeof scoreOrLevel === 'number' ? getConditionLevel(scoreOrLevel) : scoreOrLevel;
+  return { level, ...CONDITIONS[level] };
 }
 
 // machine_status seed data: 1 Critical, 2 Major, 3 Minor, 4 Routine. The under-maintenance
@@ -52,14 +39,6 @@ const STATUS_NAME_TO_ID: Record<string, number> = {
 
 export function statusIdFromName(statusName: string): number {
   return STATUS_NAME_TO_ID[statusName] ?? 4;
-}
-
-export function getConditionColorForLevel(level: ConditionLevel): string {
-  return CONDITION_COLORS[level];
-}
-
-export function getConditionBackgroundForLevel(level: ConditionLevel): string {
-  return CONDITION_BACKGROUNDS[level];
 }
 
 export type ConditionCounts = Record<ConditionLevel, number>;

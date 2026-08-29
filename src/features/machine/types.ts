@@ -1,28 +1,3 @@
-export type Machine = {
-  id: number;
-  machineName: string;
-  location: string;
-  productionYear: number;
-  createdAt: string;
-};
-
-// Mirrors smart_table's MachineDetail (GET /api/machine/details) - the AHS score,
-// status, and timestamps used to render the dashboard live come from here, not
-// from the plain machine list.
-export type MachineDetail = {
-  id: number;
-  machineId: number;
-  machineName: string;
-  location: string;
-  productionYear: number | null;
-  operationHours: number;
-  downtimeHours: number;
-  ahs: number | null;
-  statusId: number;
-  statusName: string;
-  lastUpdate: string;
-};
-
 // Mirrors smart_table's UnderMaintenance list row (GET /api/machine/under-maintenance) -
 // one open work order (undermaintenance.maintenance = 1) joined with its machine_detail,
 // status, and event_maintenance rows. `id` is the work-order id, NOT the machine id.
@@ -94,5 +69,6 @@ export type CompletedMaintenanceItem = {
   maintenanceType: string | null;
   actionId: number | null;
   action: string | null;
+  actionBy: string | null; // `action.name` - the technician who logged it
 };
 

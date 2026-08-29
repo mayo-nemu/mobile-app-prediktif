@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import {
-  getConditionBackgroundForLevel,
-  getConditionColorForLevel,
+  getCondition,
   type ConditionCounts,
   type ConditionLevel,
 } from '@/features/machine/utils/machineCondition';
@@ -22,18 +21,15 @@ type ConditionSummaryProps = {
 export function ConditionSummary({ counts }: ConditionSummaryProps) {
   return (
     <View style={styles.row}>
-      {SUMMARY_ORDER.map(({ level, label }) => (
-        <View
-          key={level}
-          style={[
-            styles.box,
-            { backgroundColor: getConditionBackgroundForLevel(level), borderColor: getConditionColorForLevel(level) },
-          ]}
-        >
-          <Text style={[styles.count, { color: getConditionColorForLevel(level) }]}>{counts[level]}</Text>
-          <Text style={styles.label}>{label}</Text>
-        </View>
-      ))}
+      {SUMMARY_ORDER.map(({ level, label }) => {
+        const { color, background } = getCondition(level);
+        return (
+          <View key={level} style={[styles.box, { backgroundColor: background, borderColor: color }]}>
+            <Text style={[styles.count, { color }]}>{counts[level]}</Text>
+            <Text style={styles.label}>{label}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }

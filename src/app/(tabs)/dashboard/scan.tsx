@@ -1,5 +1,5 @@
-import { ScanScreen } from '@/features/dashboard/screens/ScanScreen';
+import { QrScanScreen } from '@/features/dashboard/screens/QrScanScreen';
 
 export default function Scan() {
-  return <ScanScreen />;
+  return <QrScanScreen />;
 }

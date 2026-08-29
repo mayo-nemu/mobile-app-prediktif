@@ -1,18 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { FontAwesome6, type FontAwesome6SolidIconName } from '@react-native-vector-icons/fontawesome6';
+import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
 import type { CompletedMaintenanceItem } from '../types';
 import { formatActivityDate } from '@/shared/utils/formatTime';
-
-const FAILURE_COLORS = { background: '#FDECEC', icon: '#D32F2F' };
-const SERVICE_COLORS = { background: '#E8F1FC', icon: '#1E8EF2' };
-
-function isFailureEvent(event: string | null): boolean {
-  return event === 'Failure';
-}
-
-function getActivityIcon(event: string | null): FontAwesome6SolidIconName {
-  return isFailureEvent(event) ? 'triangle-exclamation' : 'wrench';
-}
 
 // um.last_update comes back as "0001-01-01T00:00:00" when it was never set.
 function hasRealTimestamp(isoString: string): boolean {
@@ -24,21 +13,25 @@ type ActivityListItemProps = {
   activity: CompletedMaintenanceItem;
 };
 
+// Every row here is a closed work order (maintenance = 0 with an action logged), so
+// they're all "Perbaikan selesai" - the useful detail is the technician's note.
 export function ActivityListItem({ activity }: ActivityListItemProps) {
-  const colors = isFailureEvent(activity.event) ? FAILURE_COLORS : SERVICE_COLORS;
-  const title = activity.maintenanceType ?? activity.event ?? 'Aktivitas maintenance';
+  const meta = [
+    hasRealTimestamp(activity.lastUpdate) ? formatActivityDate(activity.lastUpdate) : null,
+    activity.actionBy,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <View style={styles.container}>
-      <View style={[styles.iconBox, { backgroundColor: colors.background }]}>
-        <FontAwesome6 name={getActivityIcon(activity.event)} iconStyle="solid" size={18} color={colors.icon} />
+      <View style={styles.iconBox}>
+        <FontAwesome6 name="wrench" iconStyle="solid" size={18} color="#8C8C8C" />
       </View>
       <View style={styles.textContainer}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title}>Perbaikan selesai</Text>
         <Text style={styles.description}>{activity.action ?? 'Tidak ada catatan tindakan.'}</Text>
-        {hasRealTimestamp(activity.lastUpdate) && (
-          <Text style={styles.meta}>{formatActivityDate(activity.lastUpdate)}</Text>
-        )}
+        {meta.length > 0 && <Text style={styles.meta}>{meta}</Text>}
       </View>
     </View>
   );
@@ -55,6 +48,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
+    backgroundColor: '#F2F2F2',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

@@ -5,18 +5,18 @@ import { useRouter } from 'expo-router';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
 import { PillButton } from '@/shared/components/PillButton';
 import { ScannedMachineCard } from '../components/ScannedMachineCard';
-import { getMachineDetailByMachineId } from '@/features/machine/api/machinesApi';
+import { getOpenWorkOrderByMachineId } from '@/features/machine/api/machinesApi';
 import { parseMachineIdFromQrCode } from '../utils/parseMachineQrCode';
 import { ApiError } from '@/shared/api/apiClient';
-import type { MachineDetail } from '@/features/machine/types';
+import type { MaintenanceItem } from '@/features/machine/types';
 
 type ScanState =
   | { status: 'scanning' }
   | { status: 'loading' }
-  | { status: 'found'; machine: MachineDetail }
+  | { status: 'found'; workOrder: MaintenanceItem }
   | { status: 'error'; message: string };
 
-export function ScanScreen() {
+export function QrScanScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [torchOn, setTorchOn] = useState(false);
@@ -35,12 +35,12 @@ export function ScanScreen() {
 
     setScan({ status: 'loading' });
     try {
-      const machine = await getMachineDetailByMachineId(machineId);
-      if (!machine) {
-        setScan({ status: 'error', message: `Mesin dengan ID ${machineId} tidak ditemukan.` });
+      const workOrder = await getOpenWorkOrderByMachineId(machineId);
+      if (!workOrder) {
+        setScan({ status: 'error', message: 'Mesin ini tidak sedang dalam perbaikan.' });
         return;
       }
-      setScan({ status: 'found', machine });
+      setScan({ status: 'found', workOrder });
     } catch (err) {
       setScan({
         status: 'error',
@@ -57,7 +57,7 @@ export function ScanScreen() {
     if (scan.status !== 'found') {
       return;
     }
-    router.push(`/dashboard/maintenance/${scan.machine.machineId}`);
+    router.push(`/maintenance/${scan.workOrder.machineId}`);
   };
 
   const isScanning = scan.status === 'scanning';
@@ -116,13 +116,7 @@ export function ScanScreen() {
 
         {permission?.granted && scan.status === 'found' && (
           <View style={styles.resultContainer}>
-            <ScannedMachineCard machine={scan.machine} />
-            <View style={styles.resultActions}>
-              <PillButton label="Buka data mesin" onPress={handleOpenMachineData} />
-              <Pressable onPress={handleScanAgain} hitSlop={8}>
-                <Text style={styles.scanAgainText}>Scan ulang</Text>
-              </Pressable>
-            </View>
+            <ScannedMachineCard workOrder={scan.workOrder} onOpenData={handleOpenMachineData} />
           </View>
         )}
 
@@ -202,15 +196,6 @@ const styles = StyleSheet.create({
     left: 21,
     right: 21,
     bottom: 24,
-  },
-  resultActions: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  scanAgainText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
   errorCard: {
     backgroundColor: '#fff',
