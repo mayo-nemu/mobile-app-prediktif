@@ -1,12 +1,12 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { MachineDetail } from '@/features/machine/types';
+import type { MaintenanceItem } from '@/features/machine/types';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
 import { getConditionColor } from '@/features/machine/utils/machineCondition';
 import { formatUpdateTime } from '@/shared/utils/formatTime';
 
 type MachineCardProps = {
-  machine: MachineDetail;
+  machine: MaintenanceItem;
   onPress: () => void;
 };
 
@@ -28,7 +28,7 @@ export const MachineCard = memo(function MachineCard({ machine, onPress }: Machi
       </View>
       <View style={styles.textContainer}>
         <Text style={[styles.condition, { color: conditionColor }]}>AHS {ahs}%</Text>
-        <Text style={styles.detail}>{formatUpdateTime(machine.lastUpdate)}</Text>
+        <Text style={styles.detail}>{formatUpdateTime(machine.createdAt)}</Text>
       </View>
     </Pressable>
   );

@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
-import type { MachineDetail } from '@/features/machine/types';
+import type { MaintenanceItem } from '@/features/machine/types';
 
 type UrgentMachineCardProps = {
-  machine: MachineDetail;
+  machine: MaintenanceItem;
   category: string | null;
   onPress: () => void;
 };

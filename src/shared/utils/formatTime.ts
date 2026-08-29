@@ -16,10 +16,11 @@ export function formatActivityDate(isoString: string): string {
   return `${date.getDate()} ${MONTH_ABBREVIATIONS[date.getMonth()]}`;
 }
 
-// Converts an hours count (e.g. MachineDetail.operationHours/downtimeHours,
-// which may be fractional) into an "HH:MM:SS" duration string.
-export function formatHoursDuration(totalHours: number): string {
-  const totalSeconds = Math.max(0, Math.round(totalHours * 3600));
+// operation_hours / downtime_hours are misnamed on the backend - they're second
+// counters (the update endpoints take `secondsToAdd`, the web app ticks them once
+// per second). Formats that raw second count as an "HH:MM:SS" duration string.
+export function formatSecondsDuration(totalSeconds: number): string {
+  totalSeconds = Math.max(0, Math.round(totalSeconds));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;

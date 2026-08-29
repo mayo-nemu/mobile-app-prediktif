@@ -1,5 +1,3 @@
-import type { MachineDetail } from '../types';
-
 export type ConditionLevel = 'critical' | 'major' | 'minor' | 'routine';
 
 const CONDITION_COLORS: Record<ConditionLevel, string> = {
@@ -43,6 +41,19 @@ export function getConditionBackground(score: number): string {
   return CONDITION_BACKGROUNDS[getConditionLevel(score)];
 }
 
+// machine_status seed data: 1 Critical, 2 Major, 3 Minor, 4 Routine. The under-maintenance
+// endpoints only return status_name, so map back to the id when the API needs one.
+const STATUS_NAME_TO_ID: Record<string, number> = {
+  Critical: 1,
+  Major: 2,
+  Minor: 3,
+  Routine: 4,
+};
+
+export function statusIdFromName(statusName: string): number {
+  return STATUS_NAME_TO_ID[statusName] ?? 4;
+}
+
 export function getConditionColorForLevel(level: ConditionLevel): string {
   return CONDITION_COLORS[level];
 }
@@ -55,7 +66,7 @@ export type ConditionCounts = Record<ConditionLevel, number>;
 
 // Machines with no AHS score yet are excluded rather than bucketed as
 // "critical" - missing data isn't the same as a bad score (see sortByUrgency).
-export function countByCondition(machines: MachineDetail[]): ConditionCounts {
+export function countByCondition(machines: { ahs: number | null }[]): ConditionCounts {
   const counts: ConditionCounts = { critical: 0, major: 0, minor: 0, routine: 0 };
   for (const machine of machines) {
     if (machine.ahs === null) continue;

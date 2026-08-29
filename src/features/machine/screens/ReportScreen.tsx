@@ -1,82 +1,97 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
 import { PillButton } from '@/shared/components/PillButton';
 import { ApiError } from '@/shared/api/apiClient';
-import { getMachineDetailByMachineId } from '../api/machinesApi';
-import { formatHoursDuration } from '@/shared/utils/formatTime';
-import type { MachineDetail } from '../types';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { completeWorkOrder, getMachinePrediction, getUnderMaintenanceById } from '../api/machinesApi';
+import { statusIdFromName } from '../utils/machineCondition';
+import { formatSecondsDuration } from '@/shared/utils/formatTime';
+import type { MaintenanceDetail } from '../types';
 import { AssessmentField } from '../components/AssessmentField';
 
 type ReportScreenProps = {
   machineId: number;
+  workOrderId: number;
 };
 
-export function ReportScreen({ machineId }: ReportScreenProps) {
+function daysLabel(value: number | null): string {
+  return value !== null ? `${value} hari` : '-';
+}
+
+export function ReportScreen({ workOrderId }: ReportScreenProps) {
   const router = useRouter();
-  const [machine, setMachine] = useState<MachineDetail | null>(null);
+  const { user } = useAuth();
+  const [workOrder, setWorkOrder] = useState<MaintenanceDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [productionYear, setProductionYear] = useState('');
-  const [ahsScore, setAhsScore] = useState('');
-  const [operationHours, setOperationHours] = useState('');
-  const [downtimeHours, setDowntimeHours] = useState('');
-  const [daysSinceService, setDaysSinceService] = useState('');
-  const [daysSinceFailure, setDaysSinceFailure] = useState('');
-  const [category, setCategory] = useState('');
-  const [event, setEvent] = useState('');
   const [notes, setNotes] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadMachine = useCallback(async () => {
+  const loadWorkOrder = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await getMachineDetailByMachineId(machineId);
-      if (!result) {
-        setError(`Mesin dengan ID ${machineId} tidak ditemukan.`);
-        return;
-      }
-      setMachine(result);
+      setWorkOrder(await getUnderMaintenanceById(workOrderId));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gagal memuat data mesin.');
     } finally {
       setIsLoading(false);
     }
-  }, [machineId]);
+  }, [workOrderId]);
 
   useEffect(() => {
-    loadMachine();
-  }, [loadMachine]);
+    loadWorkOrder();
+  }, [loadWorkOrder]);
 
-  const handleSubmit = () => {
-    if (!notes.trim()) {
+  const handleSubmit = async () => {
+    const action = notes.trim();
+    if (!action) {
       setSubmitError('Catatan teknisi wajib diisi.');
       return;
     }
+    if (!user) {
+      setSubmitError('Sesi pengguna tidak ditemukan. Silakan login kembali.');
+      return;
+    }
+    if (!workOrder) return;
     setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      // Ask the AI model to re-score the machine post-repair. If it can't (no prior
+      // completed history to learn from -> 404, or the ML service is down -> 500),
+      // carry the machine's current health forward unchanged rather than blocking
+      // the technician from closing the work order.
+      let ahs = workOrder.ahs ?? 0;
+      let statusId = statusIdFromName(workOrder.statusName);
+      let scoredByAi = false;
+      if (workOrder.machineDetailId !== null) {
+        try {
+          const prediction = await getMachinePrediction(workOrder.machineDetailId);
+          ahs = Math.round(prediction.healthScore);
+          statusId = statusIdFromName(prediction.severity);
+          scoredByAi = true;
+        } catch {
+          // fall back to the current values set above
+        }
+      }
 
-    // TODO: POST /api/machine/under-maintenance only accepts
-    // { machineId, machineName, maintenance, eventId } - there's no endpoint
-    // exposing the event_maintenance lookup table, so "Kategori Kejadian" /
-    // "Kejadian" can't be turned into a real eventId yet, and there's no
-    // field anywhere to store "Catatan Teknisi". Wire this up for real once
-    // both exist on the backend.
-    console.log('Submit penilaian', {
-      machineId,
-      productionYear,
-      ahsScore,
-      operationHours,
-      downtimeHours,
-      daysSinceService,
-      daysSinceFailure,
-      category,
-      event,
-      notes,
-    });
-    router.back();
+      await completeWorkOrder(workOrderId, { userId: user.userId, name: user.name, action, ahs, statusId });
+      Alert.alert(
+        'Penilaian terkirim',
+        scoredByAi
+          ? `Maintenance selesai. Skor kesehatan aset diperbarui menjadi ${ahs}%.`
+          : 'Maintenance mesin ditandai selesai.',
+        [{ text: 'OK', onPress: () => router.dismissAll() }],
+      );
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : 'Gagal mengirim penilaian.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -93,61 +108,50 @@ export function ReportScreen({ machineId }: ReportScreenProps) {
       {!isLoading && error && (
         <View style={styles.stateBox}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={loadMachine}>
+          <Pressable onPress={loadWorkOrder}>
             <Text style={styles.link}>Coba lagi</Text>
           </Pressable>
         </View>
       )}
 
-      {!isLoading && !error && machine && (
+      {!isLoading && !error && workOrder && (
         <ScrollView contentContainerStyle={styles.content}>
           <AssessmentField
             label="Tahun Produksi"
-            value={productionYear}
-            onChangeText={setProductionYear}
-            placeholder={machine.productionYear?.toString() ?? '-'}
-            keyboardType="number-pad"
+            editable={false}
+            value={workOrder.productionYear?.toString() ?? '-'}
           />
           <AssessmentField
             label="Nilai AHS Score"
-            value={ahsScore}
-            onChangeText={setAhsScore}
-            placeholder={`${machine.ahs ?? 0}%`}
-            keyboardType="number-pad"
+            editable={false}
+            value={workOrder.ahs !== null ? `${workOrder.ahs}%` : '-'}
           />
           <AssessmentField
             label="Jam Operasional (HH:MM:SS)"
-            value={operationHours}
-            onChangeText={setOperationHours}
-            placeholder={formatHoursDuration(machine.operationHours)}
+            editable={false}
+            value={formatSecondsDuration(workOrder.operationHours)}
           />
           <AssessmentField
             label="Jam Downtime (HH:MM:SS)"
-            value={downtimeHours}
-            onChangeText={setDowntimeHours}
-            placeholder={formatHoursDuration(machine.downtimeHours)}
+            editable={false}
+            value={formatSecondsDuration(workOrder.downtimeHours)}
           />
           <AssessmentField
             label="Hari Terakhir Servis"
-            value={daysSinceService}
-            onChangeText={setDaysSinceService}
-            placeholder="-"
-            keyboardType="number-pad"
+            editable={false}
+            value={daysLabel(workOrder.daysSinceLastService)}
           />
           <AssessmentField
             label="Rentang Dari Terakhir Failure"
-            value={daysSinceFailure}
-            onChangeText={setDaysSinceFailure}
-            placeholder="-"
-            keyboardType="number-pad"
+            editable={false}
+            value={daysLabel(workOrder.daysBetweenEvents)}
           />
           <AssessmentField
             label="Kategori Kejadian"
-            value={category}
-            onChangeText={setCategory}
-            placeholder="Corrective Maintenance"
+            editable={false}
+            value={workOrder.maintenanceType ?? '-'}
           />
-          <AssessmentField label="Kejadian" value={event} onChangeText={setEvent} placeholder="Failure" />
+          <AssessmentField label="Kejadian" editable={false} value={workOrder.event ?? '-'} />
           <AssessmentField
             label="Catatan Teknisi *"
             value={notes}
@@ -156,7 +160,11 @@ export function ReportScreen({ machineId }: ReportScreenProps) {
             multiline
           />
           {submitError && <Text style={styles.errorText}>{submitError}</Text>}
-          <PillButton label="Kirim penilaian" onPress={handleSubmit} />
+          <PillButton
+            label={isSubmitting ? 'Mengirim...' : 'Kirim penilaian'}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          />
         </ScrollView>
       )}
     </View>

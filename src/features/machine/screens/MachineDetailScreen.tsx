@@ -3,15 +3,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useRouter } from 'expo-router';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
 import { ApiError } from '@/shared/api/apiClient';
-import { getMachineDetailByMachineId, getMachineHistory } from '../api/machinesApi';
+import { getCompletedMaintenanceHistory, getMachineDetailByMachineId } from '../api/machinesApi';
 import {
   getConditionBackground,
   getConditionColor,
   getConditionLabel,
 } from '../utils/machineCondition';
-import { formatHoursDuration } from '@/shared/utils/formatTime';
+import { formatSecondsDuration } from '@/shared/utils/formatTime';
 import { daysSinceLastService } from '../utils/daysSinceLastService';
-import type { MachineDetail, MachineHistoryItem } from '../types';
+import type { CompletedMaintenanceItem, MachineDetail } from '../types';
 import { ActivityListItem } from '../components/ActivityListItem';
 
 type MachineDetailScreenProps = {
@@ -21,7 +21,7 @@ type MachineDetailScreenProps = {
 export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
   const router = useRouter();
   const [machine, setMachine] = useState<MachineDetail | null>(null);
-  const [history, setHistory] = useState<MachineHistoryItem[]>([]);
+  const [history, setHistory] = useState<CompletedMaintenanceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,17 +29,14 @@ export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const [machineResult, historyResult] = await Promise.all([
-        getMachineDetailByMachineId(machineId),
-        getMachineHistory(machineId),
-      ]);
+      const machineResult = await getMachineDetailByMachineId(machineId);
 
       if (!machineResult) {
         setError(`Mesin dengan ID ${machineId} tidak ditemukan.`);
         return;
       }
       setMachine(machineResult);
-      setHistory(historyResult);
+      setHistory(await getCompletedMaintenanceHistory(machineResult.id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Gagal memuat data mesin.');
     } finally {
@@ -86,8 +83,8 @@ export function MachineDetailScreen({ machineId }: MachineDetailScreenProps) {
 
           <View style={styles.statGrid}>
             <StatBox label="Tahun produksi" value={machine.productionYear?.toString() ?? '-'} />
-            <StatBox label="Jam operasi" value={formatHoursDuration(machine.operationHours)} />
-            <StatBox label="Jam downtime" value={formatHoursDuration(machine.downtimeHours)} />
+            <StatBox label="Jam operasi" value={formatSecondsDuration(machine.operationHours)} />
+            <StatBox label="Jam downtime" value={formatSecondsDuration(machine.downtimeHours)} />
             <StatBox label="Hari sejak servis" value={daysSince !== null ? daysSince.toString() : '-'} />
           </View>
 

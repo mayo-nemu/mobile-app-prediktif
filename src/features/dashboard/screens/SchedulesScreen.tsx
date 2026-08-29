@@ -2,16 +2,16 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { useRouter } from 'expo-router';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
 import { MachineCard } from '../components/MachineCard';
-import { useMachineDetails } from '../hooks/useMachineDetails';
+import { useMachinesUnderMaintenance } from '../hooks/useMachinesUnderMaintenance';
 import { sortByUrgency } from '../utils/sortByUrgency';
-import type { MachineDetail } from '@/features/machine/types';
+import type { MaintenanceItem } from '@/features/machine/types';
 
 export function SchedulesScreen() {
   const router = useRouter();
-  const { machines, isLoading, error, reload } = useMachineDetails();
+  const { machines, isLoading, error, reload } = useMachinesUnderMaintenance();
   const sorted = sortByUrgency(machines);
 
-  const handleOpenMachine = (machine: MachineDetail) => {
+  const handleOpenMachine = (machine: MaintenanceItem) => {
     router.push(`/dashboard/machine/${machine.machineId}`);
   };
 
@@ -36,7 +36,7 @@ export function SchedulesScreen() {
         )}
         {!isLoading && !error && sorted.length === 0 && (
           <View style={styles.stateBox}>
-            <Text style={styles.detail}>Belum ada mesin terdaftar.</Text>
+            <Text style={styles.detail}>Tidak ada mesin dalam perbaikan.</Text>
           </View>
         )}
         {!isLoading && !error && sorted.length > 0 && (

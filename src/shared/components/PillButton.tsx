@@ -3,13 +3,15 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 type PillButtonProps = {
   label: string;
   onPress: () => void;
+  disabled?: boolean;
 };
 
-export function PillButton({ label, onPress }: PillButtonProps) {
+export function PillButton({ label, onPress, disabled }: PillButtonProps) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.button, pressed && styles.pressed, disabled && styles.disabled]}
       onPress={onPress}
+      disabled={disabled}
     >
       <Text style={styles.label}>{label}</Text>
     </Pressable>
@@ -30,6 +32,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.8,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   label: {
     color: '#fff',

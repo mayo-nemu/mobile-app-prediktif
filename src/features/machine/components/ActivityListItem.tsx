@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6, type FontAwesome6SolidIconName } from '@react-native-vector-icons/fontawesome6';
-import type { MachineHistoryItem } from '../types';
+import type { CompletedMaintenanceItem } from '../types';
 import { formatActivityDate } from '@/shared/utils/formatTime';
 
 const FAILURE_COLORS = { background: '#FDECEC', icon: '#D32F2F' };
@@ -14,17 +14,14 @@ function getActivityIcon(event: string | null): FontAwesome6SolidIconName {
   return isFailureEvent(event) ? 'triangle-exclamation' : 'wrench';
 }
 
-function getActivityDescription(activity: MachineHistoryItem): string {
-  if (activity.actionTaken) {
-    return activity.actionTaken;
-  }
-  return activity.maintenance
-    ? 'Masih berlangsung, belum ada catatan tindakan.'
-    : 'Tidak ada catatan tindakan.';
+// um.last_update comes back as "0001-01-01T00:00:00" when it was never set.
+function hasRealTimestamp(isoString: string): boolean {
+  const time = new Date(isoString).getTime();
+  return Number.isFinite(time) && time > 0;
 }
 
 type ActivityListItemProps = {
-  activity: MachineHistoryItem;
+  activity: CompletedMaintenanceItem;
 };
 
 export function ActivityListItem({ activity }: ActivityListItemProps) {
@@ -38,11 +35,10 @@ export function ActivityListItem({ activity }: ActivityListItemProps) {
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{getActivityDescription(activity)}</Text>
-        <Text style={styles.meta}>
-          {formatActivityDate(activity.createdAt)}
-          {activity.actionBy ? ` · ${activity.actionBy}` : ''}
-        </Text>
+        <Text style={styles.description}>{activity.action ?? 'Tidak ada catatan tindakan.'}</Text>
+        {hasRealTimestamp(activity.lastUpdate) && (
+          <Text style={styles.meta}>{formatActivityDate(activity.lastUpdate)}</Text>
+        )}
       </View>
     </View>
   );
