@@ -3,10 +3,13 @@ import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'rea
 type AssessmentFieldProps = {
   label: string;
   value: string;
-  onChangeText: (text: string) => void;
+  onChangeText?: (text: string) => void;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
   multiline?: boolean;
+  // When false, the field renders its value as static text (used for the machine-condition
+  // snapshot rows, which are read straight from the work order and can't be edited here).
+  editable?: boolean;
 };
 
 export function AssessmentField({
@@ -16,19 +19,24 @@ export function AssessmentField({
   placeholder,
   keyboardType,
   multiline,
+  editable = true,
 }: AssessmentFieldProps) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#8C8C8C"
-        keyboardType={keyboardType}
-        multiline={multiline}
-        style={[styles.input, multiline && styles.multilineInput]}
-      />
+      {editable ? (
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#8C8C8C"
+          keyboardType={keyboardType}
+          multiline={multiline}
+          style={[styles.input, multiline && styles.multilineInput]}
+        />
+      ) : (
+        <Text style={[styles.input, styles.readOnly]}>{value || placeholder || '-'}</Text>
+      )}
     </View>
   );
 }
@@ -57,6 +65,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     padding: 13,
+  },
+  readOnly: {
+    color: '#8C8C8C',
   },
   multilineInput: {
     minHeight: 90,

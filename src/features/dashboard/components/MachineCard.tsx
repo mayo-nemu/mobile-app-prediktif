@@ -1,34 +1,34 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { MachineDetail } from '@/features/machine/types';
+import type { MaintenanceItem } from '@/features/machine/types';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
-import { getConditionColor } from '@/features/machine/utils/machineCondition';
+import { getCondition } from '@/features/machine/utils/machineCondition';
+import { MaintenanceTypeText } from '@/features/machine/components/MaintenanceTypeText';
 import { formatUpdateTime } from '@/shared/utils/formatTime';
 
 type MachineCardProps = {
-  machine: MachineDetail;
+  machine: MaintenanceItem;
   onPress: () => void;
 };
 
 export const MachineCard = memo(function MachineCard({ machine, onPress }: MachineCardProps) {
   const ahs = machine.ahs ?? 0;
-  const conditionColor = getConditionColor(ahs);
+  const conditionColor = getCondition(ahs).color;
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={onPress}
-    >
+    <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={onPress}>
       <View style={styles.iconGroup}>
         <FontAwesome6 name="clock" iconStyle="regular" size={24} color={conditionColor} />
-        <View style={styles.textContainer}>
-          <Text style={styles.name}>{machine.machineName}</Text>
-          <Text style={styles.detail}>{machine.location}</Text>
+        <View style={styles.mainText}>
+          <Text style={styles.name} numberOfLines={1}>
+            {machine.machineName}
+          </Text>
+          <MaintenanceTypeText maintenanceType={machine.maintenanceType} style={styles.detail} />
         </View>
       </View>
-      <View style={styles.textContainer}>
+      <View style={styles.metaText}>
         <Text style={[styles.condition, { color: conditionColor }]}>AHS {ahs}%</Text>
-        <Text style={styles.detail}>{formatUpdateTime(machine.lastUpdate)}</Text>
+        <Text style={styles.detail}>{formatUpdateTime(machine.createdAt)}</Text>
       </View>
     </Pressable>
   );
@@ -39,6 +39,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     paddingVertical: 21,
     paddingHorizontal: 8,
     backgroundColor: '#fff',
@@ -46,27 +47,32 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#D7D7D7',
-    elevation: 1
+    elevation: 1,
   },
   pressed: {
     opacity: 0.7,
   },
   iconGroup: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 16,
   },
-  textContainer: {
-    marginLeft: 16,
+  mainText: {
+    flex: 1,
+    gap: 4,
+  },
+  metaText: {
+    alignItems: 'flex-end',
+    gap: 4,
   },
   name: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   condition: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   detail: {
     fontSize: 12,

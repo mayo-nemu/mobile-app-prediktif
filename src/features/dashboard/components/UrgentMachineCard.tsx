@@ -1,9 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
-import type { MachineDetail } from '@/features/machine/types';
+import type { MaintenanceItem } from '@/features/machine/types';
+import { MaintenanceTypeText } from '@/features/machine/components/MaintenanceTypeText';
 
 type UrgentMachineCardProps = {
-  machine: MachineDetail;
+  machine: MaintenanceItem;
   category: string | null;
   onPress: () => void;
 };
@@ -14,7 +15,9 @@ export function UrgentMachineCard({ machine, category, onPress }: UrgentMachineC
       <FontAwesome6 name="triangle-exclamation" iconStyle="solid" size={22} color="#FF0A0A" />
       <View style={styles.textContainer}>
         <Text style={styles.name}>{machine.machineName}</Text>
-        {category && <Text style={styles.detail}>Kategori: {category}</Text>}
+        {category && (
+          <MaintenanceTypeText maintenanceType={category} prefix="Kategori: " style={styles.detail} />
+        )}
         <Text style={styles.detail}>Lokasi: {machine.location}</Text>
       </View>
       <FontAwesome6 name="chevron-right" iconStyle="solid" size={16} color="#FF0A0A" />

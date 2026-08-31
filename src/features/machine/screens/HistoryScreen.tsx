@@ -1,19 +1,37 @@
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome6 } from '@react-native-vector-icons/fontawesome6';
-import { MachineCard } from '../components/MachineCard';
-import { useMachinesUnderMaintenance } from '../hooks/useMachinesUnderMaintenance';
-import { sortByUrgency } from '../utils/sortByUrgency';
-import type { MaintenanceItem } from '@/features/machine/types';
+import { ApiError } from '@/shared/api/apiClient';
+import { getCompletedMaintenanceHistory } from '../api/machinesApi';
+import type { CompletedMaintenanceItem } from '../types';
+import { ActivityListItem } from '../components/ActivityListItem';
 
-export function SchedulesScreen() {
+type HistoryScreenProps = {
+  machineDetailId: number;
+};
+
+export function HistoryScreen({ machineDetailId }: HistoryScreenProps) {
   const router = useRouter();
-  const { machines, isLoading, error, reload } = useMachinesUnderMaintenance();
-  const sorted = sortByUrgency(machines);
+  const [history, setHistory] = useState<CompletedMaintenanceItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleOpenMachine = (machine: MaintenanceItem) => {
-    router.push(`/machine/${machine.machineId}`);
-  };
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      setHistory(await getCompletedMaintenanceHistory(machineDetailId));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Gagal memuat riwayat aktivitas.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [machineDetailId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return (
     <View style={styles.container}>
@@ -21,32 +39,33 @@ export function SchedulesScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <FontAwesome6 name="chevron-left" iconStyle="solid" size={20} color="#000" />
         </Pressable>
-        <Text style={styles.headerTitle}>Semua Jadwal</Text>
+        <Text style={styles.headerTitle}>Riwayat aktivitas</Text>
       </View>
 
       <View style={styles.content}>
         {isLoading && <ActivityIndicator style={styles.stateBox} color="#1E8EF2" />}
+
         {!isLoading && error && (
           <View style={styles.stateBox}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable onPress={reload}>
+            <Pressable onPress={load}>
               <Text style={styles.link}>Coba lagi</Text>
             </Pressable>
           </View>
         )}
-        {!isLoading && !error && sorted.length === 0 && (
+
+        {!isLoading && !error && history.length === 0 && (
           <View style={styles.stateBox}>
-            <Text style={styles.detail}>Tidak ada mesin dalam perbaikan.</Text>
+            <Text style={styles.detail}>Belum ada riwayat aktivitas untuk mesin ini.</Text>
           </View>
         )}
-        {!isLoading && !error && sorted.length > 0 && (
+
+        {!isLoading && !error && history.length > 0 && (
           <FlatList
-            data={sorted}
-            keyExtractor={(machine) => machine.id.toString()}
-            renderItem={({ item }) => (
-              <MachineCard machine={item} onPress={() => handleOpenMachine(item)} />
-            )}
-            onRefresh={reload}
+            data={history}
+            keyExtractor={(activity) => activity.id.toString()}
+            renderItem={({ item }) => <ActivityListItem activity={item} />}
+            onRefresh={load}
             refreshing={false}
           />
         )}
